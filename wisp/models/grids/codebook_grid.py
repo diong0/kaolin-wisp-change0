@@ -125,7 +125,8 @@ class CodebookOctreeGrid(OctreeGrid):
             y_hard2 = (torch.zeros_like(logits, memory_format=torch.legacy_contiguous_format)
                        .scatter_(-1, index2, topk_values2_normalized))
             keys2 = y_hard2 - y_soft.detach() + y_soft  # 使用 STE 进行梯度回传
-            return (self.dictionary[lod_idx][None, None] * keys2[..., None]).sum(-2)
+            result = (self.dictionary[lod_idx][None, None] * keys2[..., None]).sum(-2)
+            return result
 
             # TODO(ttakikawa): Replace with a cleaner / faster softmax implementation
             #keys = F.softmax(feats[idx.long()], dim=-1)
