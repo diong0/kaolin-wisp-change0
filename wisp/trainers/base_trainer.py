@@ -22,29 +22,29 @@ from wisp.renderer.core.api import add_to_scene_graph
 
 
 @configure
-class ConfigBaseTrainer:
+class ConfigBaseTrainer:  # 配置类
     """ Configuration common to base trainer and its derivatives """
-
+    # 优化器
     optimizer: Union[ConfigAdam, ConfigRMSprop, ConfigFusedAdam, ConfigAdamW]
     """ Optimizer to be used, includes optimizer modules available within `torch.optim` 
         and fused optimizers from `apex`.
     """
-
+    # 数据加载器
     dataloader: ConfigDataloader
     """ Dataloader configuration, used during optimization. """
-
+    # 实验名称
     exp_name: str
     """ Name of the experiment: a unique id to use for logging, model names, etc. """
-
+    # 训练模式
     mode: str = 'train'  # options: 'train', 'validate'
     """ Trainer mode: 
     'train': Trainer will optimize the given pipeline. 
     'validate': Only run validation, expects to run a pretrained model.
-    """ 
-
+    """
+    # 最大周期数
     max_epochs: int = 250
     """ Number of epochs to run the training. """
-
+    # 保存频率
     save_every: int = -1
     """ Saves the optimized model every N epochs """
 
@@ -53,14 +53,14 @@ class ConfigBaseTrainer:
 
     model_format: str = 'full'  # options: 'full', 'state_dict'
     """ Format to save the model: 'full' (weights+model) or 'state_dict' """
-
-    render_every : int = 100
+    # 渲染频率
+    render_every: int = 100
     """ Renders an image of the neural field every N epochs """
 
     valid_every: int = -1
     """ Runs validation every N epochs """
-    
-    valid_split : str = 'test'
+
+    valid_split: str = 'test'
     """ Split to use for validation """
 
     enable_amp: bool = True
@@ -69,22 +69,23 @@ class ConfigBaseTrainer:
     profile_nvtx: bool = True
     """ If enabled, nvtx markers will be emitted by torch for profiling. See: torch.autograd.profiler.emit_nvtx"""
 
-    grid_lr_weight : float = 1.0
+    grid_lr_weight: float = 1.0
     """ Learning rate weighting applied only for the grid parameters
         (e.g. parameters which contain "grid" in their name)
     """
-    
-    scheduler : bool = False
+
+    scheduler: bool = False
     """ If enabled, will use learning rate scheduling. """
 
-    scheduler_milestones : Tuple[float, ...] = (0.5, 0.75, 0.9)
+    scheduler_milestones: Tuple[float, ...] = (0.5, 0.75, 0.9)
     """ The milestones during training (as a ratio of total iterations) to adjust learning rate. """
 
-    scheduler_gamma : float = 0.333 
+    scheduler_gamma: float = 0.333
     """ The amount to adjust learning rate at the milestones. """
-    
-    valid_metrics : Tuple[str, ...] = ('psnr', ) # lpips, ssim are also supported
+
+    valid_metrics: Tuple[str, ...] = ('psnr',)  # lpips, ssim are also supported
     """ The validation metrics to use. Will tend to vary based on application. """
+
 
 class BaseTrainer(ABC):
     """
@@ -192,7 +193,7 @@ class BaseTrainer(ABC):
         # Add object to scene graph: if interactive mode is on, this will make sure the visualizer can display it.
         # batch_size is an optional setup arg here which hints the visualizer how many rays can be processed at once
         # (e.g. this is the pipeline's batch_size used for inference time)
-        add_to_scene_graph(state=self.scene_state, name=self.cfg.exp_name, obj=self.pipeline, batch_size=2**14)
+        add_to_scene_graph(state=self.scene_state, name=self.cfg.exp_name, obj=self.pipeline, batch_size=2 ** 14)
 
     def init_dataloader(self):
         self.train_data_loader = DataLoader(self.train_dataset,
@@ -205,7 +206,7 @@ class BaseTrainer(ABC):
     def init_optimizer(self):
         """Default initialization for the optimizer.
         """
-        params_dict = { name : param for name, param in self.pipeline.nef.named_parameters()}
+        params_dict = {name: param for name, param in self.pipeline.nef.named_parameters()}
 
         params = []
         decoder_params = []
@@ -229,7 +230,7 @@ class BaseTrainer(ABC):
         lr = self.cfg.optimizer.lr
         eps = self.cfg.optimizer.eps
         weight_decay = self.cfg.optimizer.weight_decay
-        
+
         params.append({"params": decoder_params, "lr": lr, "eps": eps, "weight_decay": weight_decay})
         params.append({"params": grid_params, "eps": eps, "lr": lr * self.cfg.grid_lr_weight})
         params.append({"params": rest_params, "eps": eps, "lr": lr})
@@ -327,7 +328,7 @@ class BaseTrainer(ABC):
                 self.iteration += 1
                 data = self.next_batch()
             except StopIteration:
-                self.end_epoch()    # determines if optimization keeps running
+                self.end_epoch()  # determines if optimization keeps running
                 if self.is_any_iterations_remaining():
                     self.begin_epoch()
                     data = self.next_batch()
@@ -361,7 +362,7 @@ class BaseTrainer(ABC):
     def train(self):
         """
         Override this if some very specific training procedure is needed.
-        
+
         Returns:
             (dict): The dictionary with validation metrics and other information as needed.
         """
@@ -433,7 +434,7 @@ class BaseTrainer(ABC):
             self.render_snapshot()  # Render visualizations to disk, possibly log to experiment dashboards
 
         if self.is_time_to_save():
-            self.save_model()       # Save model to disk, possibly log artifact
+            self.save_model()  # Save model to disk, possibly log artifact
 
     def pre_step(self):
         """

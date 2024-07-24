@@ -29,39 +29,39 @@ class NeRFAppConfig:
     """ A script for training simple NeRF variants with grid backbones."""
 
     blas: autoconfig(OctreeAS.make_dense, OctreeAS.from_pointcloud, AxisAlignedBBoxAS)
-    """ Bottom Level Acceleration structure used by the neural field grid to track occupancy, accelerate raymarch. """
+    """ 底部加速结构Bottom Level Acceleration structure used by the neural field grid to track occupancy, accelerate raymarch. """
     grid: autoconfig(OctreeGrid, HashGrid.from_geometric, TriplanarGrid, CodebookOctreeGrid)
-    """ Feature grid used by the neural field. Grids are located in `wisp.models.grids` """
+    """ 特征网格Feature grid used by the neural field. Grids are located in `wisp.models.grids` """
     nef: autoconfig(NeuralRadianceField)
-    """ Neural field configuration, including the feature grid, decoders and optional embedders.
+    """ 神经辐射场Neural field configuration, including the feature grid, decoders and optional embedders.
     NeuralRadianceField maps 3D coordinates (+ 2D view direction) -> RGB + density.
     Uses spatial feature grids internally for faster feature interpolation and raymarching.
     """
     tracer: autoconfig(PackedRFTracer)
-    """ Tracers are responsible for taking input rays, marching them through the neural field to render 
+    """ 光线追踪器Tracers are responsible for taking input rays, marching them through the neural field to render 
     an output RenderBuffer.
     """
     dataset: autoconfig(NeRFSyntheticDataset, RTMVDataset)
-    """ Multiview dataset used by the trainer. """
+    """ 数据集Multiview dataset used by the trainer. """
     dataset_transform: autoconfig(SampleRays)
-    """ Composition of dataset transforms used online by the dataset to process batches. """
+    """ 数据集转换Composition of dataset transforms used online by the dataset to process batches. """
     trainer: ConfigMultiviewTrainer
-    """ Configuration for trainer used to optimize the neural field. """
+    """ 训练器Configuration for trainer used to optimize the neural field. """
     tracker: ConfigTracker
-    """ Experiments tracker for reporting to tensorboard & wandb, creating visualizations and aggregating metrics. """
+    """ 跟踪器Experiments tracker for reporting to tensorboard & wandb, creating visualizations and aggregating metrics. """
     log_level: int = logging.INFO
-    """ Sets the global output log level: logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL """
+    """ 日志级别Sets the global output log level: logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL """
     pretrained: Optional[str] = None
-    """ If specified, a pretrained model will be loaded from this path. None will create a new model. """
+    """ 预训练模型的路径If specified, a pretrained model will be loaded from this path. None will create a new model. """
     device: str = 'cuda'
-    """ Device used to run the optimization """
+    """ 设备Device used to run the optimization """
     interactive: bool = os.environ.get('WISP_HEADLESS') != '1'
-    """ Set to --interactive=True for interactive mode which uses the GUI.
+    """ 是否启用交互模式Set to --interactive=True for interactive mode which uses the GUI.
     The default value is set according to the env variable WISP_HEADLESS, if available. 
     Otherwise, interactive mode is on by default. """
 
 
-cfg = parse_config(NeRFAppConfig, yaml_arg='--config')  # Obtain args by priority: cli args > config yaml > config defaults
+cfg = parse_config(NeRFAppConfig, yaml_arg='--config')  # 解析配置文件Obtain args by priority: cli args > config yaml > config defaults
 device = torch.device(cfg.device)
 default_log_setup(cfg.log_level)
 if cfg.interactive:
@@ -70,7 +70,7 @@ if cfg.interactive:
     cfg.trainer.save_every = -1
     cfg.trainer.valid_every = -1
 print_config(cfg)
-
+# 数据集加载
 # Loads a multiview dataset comprising of pairs of images and calibrated cameras:
 # NeRFSyntheticDataset - refers to the standard NeRF format popularized by Mildenhall et al. 2020,
 #   including additions to the metadata format added by Muller et al. 2022.
@@ -79,11 +79,11 @@ print_config(cfg)
 #   this dataset includes depth information which allows for performance improving optimizations in some cases.
 dataset_transform = instantiate(cfg.dataset_transform)  # SampleRays creates batches of rays from the dataset
 train_dataset = instantiate(cfg.dataset, transform=dataset_transform)  # A Multiview dataset
-validation_dataset = None
+validation_dataset = None  # 如果需要验证，创建验证数据集
 if cfg.trainer.valid_every > -1 or cfg.trainer.mode == 'validate':
     validation_dataset = train_dataset.create_split(split=cfg.trainer.valid_split, transform=None)
 
-if cfg.pretrained and cfg.trainer.model_format == "full":
+if cfg.pretrained and cfg.trainer.model_format == "full":  # 模型加载或初始化
     pipeline = torch.load(cfg.pretrained)   # Load a full pretrained pipeline: model + weights
 else:  # Create model from scratch
     # Optimization: if dataset contains depth info, initialize only cells known to be occupied
@@ -105,9 +105,9 @@ else:  # Create model from scratch
 # Joint trainer / app state - scene_state contains various global definitions
 exp_name: str = cfg.trainer.exp_name
 scene_state: WispState = WispState()
-tracker = Tracker(cfg=cfg.tracker, exp_name=exp_name)
+tracker = Tracker(cfg=cfg.tracker, exp_name=exp_name)  # 跟踪器
 tracker.save_app_config(cfg)
-trainer = MultiviewTrainer(cfg=cfg.trainer,
+trainer = MultiviewTrainer(cfg=cfg.trainer,  # 训练器
                            pipeline=pipeline,
                            train_dataset=train_dataset,
                            validation_dataset=validation_dataset,
@@ -123,9 +123,9 @@ trainer = MultiviewTrainer(cfg=cfg.trainer,
 if not cfg.interactive:
     logging.info("Running headless. For the app, set --interactive=True or $WISP_HEADLESS=0.")
     if cfg.trainer.mode == 'validate':
-        trainer.validate()
+        trainer.validate()  # 运行验证过程
     elif cfg.trainer.mode == 'train':
-        trainer.train()  # Run in headless mode
+        trainer.train()  # 运行训练过程 Run in headless mode
 else:
     from wisp.renderer.app.optimization_app import OptimizationApp
     scene_state.renderer.device = trainer.device  # Use same device for trainer and app renderer
