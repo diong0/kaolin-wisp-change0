@@ -20,7 +20,7 @@ from wisp.accelstructs import BaseAS
 
 class CodebookOctreeGrid(OctreeGrid):
     """This is a multiresolution feature grid where the octree stores indices into a fixed size codebook.
-    """
+    这是一个多分辨率特征网格，其中八叉树将索引存储到固定大小的码本中"""
     def __init__(
         self,
         blas                : BaseAS,
@@ -34,23 +34,23 @@ class CodebookOctreeGrid(OctreeGrid):
     ):
         """
         Args:
-            blas : Spatial acceleration structure which tracks the occupancy state of this grid.
+            blas : 空间加速结构 Spatial acceleration structure which tracks the occupancy state of this grid.
                    Used to speed up spatial queries and ray tracing operations.
-            feature_dim (int): Dimensionality for features stored within the grid nodes.
+            feature_dim (int): 特征维度 Dimensionality for features stored within the grid nodes.
             num_lods (int): Number of levels which store features in the grid.
                 Starts at base_lod = blas.max_level - num_lods + 1
                 num_lods must be smaller or equivalent to the number of blas levels.
-            interpolation_type (str): The type of interpolation function used when querying features on the grid.
+            interpolation_type (str): 插值类型 The type of interpolation function used when querying features on the grid.
               'linear' - uses trilinear interpolation from nearest 8 nodes.
               'closest' - uses feature from nearest grid node.
-            multiscale_type (str): The type of multiscale aggregation.
+            multiscale_type (str): 多尺度类型 The type of multiscale aggregation.
                'sum' - aggregates features from different LODs with summation.
                'cat' - aggregates features from different LODs with concatenation.
                Note that 'cat' will change the decoder input dimension to num_lods * feature_dim.
-            feature_std (float): The features are initialized with a Gaussian distribution with the given
+            feature_std (float): 特征标准差 The features are initialized with a Gaussian distribution with the given
                                  standard deviation.
-            feature_bias (float): The features are initialized with a Gaussian distribution with the given mean.
-            codebook_bitwidth (int): Codebook dictionary_size is set as 2**bitwidth
+            feature_bias (float): 特征偏置 The features are initialized with a Gaussian distribution with the given mean.
+            codebook_bitwidth (int): 码本位宽 Codebook dictionary_size is set as 2**bitwidth
         """
         self.bitwidth = codebook_bitwidth
         super().__init__(blas=blas,
@@ -68,7 +68,7 @@ class CodebookOctreeGrid(OctreeGrid):
             self.points_dual, self.pyramid_dual, self.trinkets, self.parents = \
                     wisp_spc_ops.make_trilinear_spc(self.blas.points, self.blas.pyramid)
             log.info("Built dual octree and trinkets")
-            
+
         # Create the pyramid of features.
         fpyramid = []
         for al in self.active_lods:
@@ -89,8 +89,8 @@ class CodebookOctreeGrid(OctreeGrid):
             fts += torch.randn_like(fts) * self.feature_std
             self.dictionary.append(nn.Parameter(fts))
 
-        self.features = nn.ParameterList([]) 
-        
+        self.features = nn.ParameterList([])
+
         for i in range(len(self.active_lods)):
             fts = torch.zeros(fpyramid[i], self.dictionary_size)
             fts += torch.randn_like(fts) * self.feature_std
@@ -100,8 +100,9 @@ class CodebookOctreeGrid(OctreeGrid):
         for i, f in enumerate(self.features):
             self.features[i] = nn.Parameter(f.max(dim=-1)[1].float())
 
+    # noinspection PyUnreachableCode
     def _index_features(self, feats, idx, lod_idx):
-        """Internal function. Returns the feats based on indices.
+        """根据索引返回特征 Internal function. Returns the feats based on indices.
 
         Args:
             feats (torch.FloatTensor): tensor of feats of shape [num_feats, feat_dim]
@@ -138,7 +139,7 @@ class CodebookOctreeGrid(OctreeGrid):
 
         Args:
             coords (torch.FloatTensor): coords of shape [batch, num_samples, 3]
-            lod_idx  (int): int specifying the index to ``active_lods`` 
+            lod_idx  (int): int specifying the index to ``active_lods``
             pidx (torch.LongTensor): point_hiearchy indices of shape [batch]
             features (torch.FloatTensor): features to interpolate. If ``None``, will use `self.features`.
 
@@ -148,17 +149,17 @@ class CodebookOctreeGrid(OctreeGrid):
         batch, num_samples = coords.shape[:2]
 
         if self.interpolation_type == 'linear':
-            
+
             fs = torch.zeros(batch, num_samples, self.feature_dim, device=coords.device)
-            
+
             valid_mask = pidx > -1
             valid_pidx = pidx[valid_mask]
             if valid_pidx.shape[0] == 0:
                 return fs
 
-            corner_feats = self._index_features(feats, 
+            corner_feats = self._index_features(feats,
                     self.trinkets.index_select(0, valid_pidx).long(), lod_idx)[:, None]
-            
+
             pts = self.blas.points.index_select(0, valid_pidx)[:,None].repeat(1, coords.shape[1], 1)
 
             coeffs = spc_ops.coords_to_trilinear_coeffs(coords[valid_mask], pts, self.active_lods[lod_idx])[..., None]
@@ -168,7 +169,7 @@ class CodebookOctreeGrid(OctreeGrid):
             raise NotImplementedError
         else:
             raise Exception(f"Interpolation mode {self.interpolation_type} is not supported.")
-        
+
         return fs
 
     def name(self) -> str:
