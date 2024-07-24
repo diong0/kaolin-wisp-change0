@@ -15,3 +15,5 @@ build
 imgui.ini
 wandb/
 *.nsys-rep
+.git
+.idea
