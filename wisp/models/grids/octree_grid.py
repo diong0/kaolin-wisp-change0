@@ -202,10 +202,40 @@ class OctreeGrid(BLASGrid):
             # list of [batch, num_samples, 1]
 
             for i in range(num_feats):
-                feat = self._interpolate(
-                    coords.reshape(-1, 1, 3), self.features[i], pidx[i].reshape(-1), i)[:,0]
-                feats.append(feat)
-            
+                batch, num_samples = coords.shape[:2]
+                if self.interpolation_type == 'linear':
+                    fs = torch.zeros(batch, num_samples, self.feature_dim, device=coords.device)
+                    valid_mask = pidx[i] > -1
+                    valid_pidx = pidx[i][valid_mask]
+                    if valid_pidx.shape[0] == 0:
+                        feats.append(fs)
+                        continue
+                    # _index_features
+                    idx = self.trinkets.index_select(0, valid_pidx).long()
+
+                    if self.training:
+                        logits = self.features[i][idx]
+                        y_soft = nn.functional.softmax(logits, dim=-1)
+                        index = y_soft.max(-1, keepdim=True)[1]
+                        y_hard = torch.zeros_like(logits).scatter_(-1, index, 1.0)
+                        keys = y_hard - y_soft.detach() + y_soft
+                        corner_feats = (self.dictionary[lod_idx][None, None] * keys[..., None]).sum(-2)
+                    else:
+                        keys = torch.max(self.features[i][idx], dim=-1)[1]
+                        corner_feats = self.dictionary[lod_idx][keys]
+
+                    corner_feats = corner_feats[:, None]
+                    pts = self.blas.points.index_select(0, valid_pidx)[:, None].repeat(1, coords.shape[1], 1)
+                    coeffs = spc_ops.coords_to_trilinear_coeffs(coords[valid_mask], pts, self.active_lods[lod_idx])[..., None]
+                    fs[valid_mask] = (corner_feats * coeffs).sum(-2)
+
+                elif self.interpolation_type == 'closest':
+                    raise NotImplementedError
+                else:
+                    raise Exception(f"Interpolation mode {self.interpolation_type} is not supported.")
+
+                feats.append(fs[:, 0])
+
             feats = torch.cat(feats, dim=-1)
 
             if self.multiscale_type == 'sum':
