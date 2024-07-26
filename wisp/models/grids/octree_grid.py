@@ -203,9 +203,9 @@ class OctreeGrid(BLASGrid):
 
             for i in range(num_feats):
                 feat = self._interpolate(
-                    coords.reshape(-1, 1, 3), self.features[i], pidx[i].reshape(-1), i)[:,0]
+                    coords.reshape(-1, 1, 3), self.features[i], pidx[i].reshape(-1), i)[:, 0]
                 feats.append(feat)
-            
+
             feats = torch.cat(feats, dim=-1)
 
             if self.multiscale_type == 'sum':

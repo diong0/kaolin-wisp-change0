@@ -158,8 +158,21 @@ class CodebookOctreeGrid(OctreeGrid):
             if valid_pidx.shape[0] == 0:
                 return fs
 
-            corner_feats = self._index_features(feats,
-                    self.trinkets.index_select(0, valid_pidx).long(), lod_idx)[:, None]
+            # Combine the _index_features logic here
+            idx = self.trinkets.index_select(0, valid_pidx).long()
+
+            if self.training:
+                logits = feats[idx]
+                y_soft = F.softmax(logits, dim=-1)
+                index = y_soft.max(-1, keepdim=True)[1]
+                y_hard = torch.zeros_like(logits).scatter_(-1, index, 1.0)
+                keys = y_hard - y_soft.detach() + y_soft
+                corner_feats = (self.dictionary[lod_idx][None, None] * keys[..., None]).sum(-2)
+            else:
+                keys = torch.max(feats[idx], dim=-1)[1]
+                corner_feats = self.dictionary[lod_idx][keys]
+
+            corner_feats = corner_feats[:, None]
 
             pts = self.blas.points.index_select(0, valid_pidx)[:,None].repeat(1, coords.shape[1], 1)
 
