@@ -213,6 +213,7 @@ class OctreeGrid(BLASGrid):
                     valid_pidx = pidx_1[valid_mask]
                     if valid_pidx.shape[0] == 0:
                         feat = fs
+                        feats.append(feat)
                         break
                     idx = self.trinkets.index_select(0, valid_pidx).long()
                     if self.training:
