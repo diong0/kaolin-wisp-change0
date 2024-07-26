@@ -217,12 +217,12 @@ class OctreeGrid(BLASGrid):
                         break
                     idx = self.trinkets.index_select(0, valid_pidx).long()
                     if self.training:
-                        logits = feats_1[idx]  # 取idx_feature
+                        logits = feats_1[idx]  # 取idx_feature[n,8,16]
                         y_soft = nn.functional.softmax(logits, dim=-1)
                         index = y_soft.max(-1, keepdim=True)[1]
                         y_hard = torch.zeros_like(logits).scatter_(-1, index, 1.0)
                         keys = y_hard - y_soft.detach() + y_soft
-                        corner_feats = (self.dictionary[lod_idx_1][None, None] * keys[..., None]).sum(-2)
+                        corner_feats = (self.dictionary[lod_idx_1][None, None] * keys[..., None]).sum(-2)  # [n,8,5]
                     else:
                         keys = torch.max(feats_1[idx], dim=-1)[1]
                         corner_feats = self.dictionary[lod_idx][keys]
