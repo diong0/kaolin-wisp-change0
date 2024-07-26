@@ -214,7 +214,7 @@ class OctreeGrid(BLASGrid):
                     if valid_pidx.shape[0] == 0:
                         feat = fs
                         feats.append(feat)
-                        break
+                        continue
                     idx = self.trinkets.index_select(0, valid_pidx).long()
                     if self.training:
                         logits = feats_1[idx]  # 取idx_feature[n,8,16]
@@ -229,7 +229,10 @@ class OctreeGrid(BLASGrid):
                     corner_feats = corner_feats[:, None]
                     pts = self.blas.points.index_select(0, valid_pidx)[:, None].repeat(1, coords_1.shape[1], 1)
                     coeffs = spc_ops.coords_to_trilinear_coeffs(coords_1[valid_mask], pts, self.active_lods[lod_idx_1])[..., None]  # 系数
-                    fs[valid_mask] = (corner_feats * coeffs).sum(-2)
+                    logits = logits[:, None, :, :]  # [n, 1, 8, feature_dim]
+                    fs[valid_mask] = (logits * coeffs).sum(-2)  # [n, num_samples, feature_dim]
+
+                    # fs[valid_mask] = (corner_feats * coeffs).sum(-2)
                 elif self.interpolation_type == 'closest':
                     raise NotImplementedError
                 else:
