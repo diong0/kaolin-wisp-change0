@@ -217,7 +217,7 @@ class OctreeGrid(BLASGrid):
                         break
                     idx = self.trinkets.index_select(0, valid_pidx).long()
                     if self.training:
-                        logits = feats_1[idx]
+                        logits = feats_1[idx]  # 取idx_feature
                         y_soft = nn.functional.softmax(logits, dim=-1)
                         index = y_soft.max(-1, keepdim=True)[1]
                         y_hard = torch.zeros_like(logits).scatter_(-1, index, 1.0)
@@ -228,7 +228,7 @@ class OctreeGrid(BLASGrid):
                         corner_feats = self.dictionary[lod_idx][keys]
                     corner_feats = corner_feats[:, None]
                     pts = self.blas.points.index_select(0, valid_pidx)[:, None].repeat(1, coords_1.shape[1], 1)
-                    coeffs = spc_ops.coords_to_trilinear_coeffs(coords_1[valid_mask], pts, self.active_lods[lod_idx_1])[..., None]
+                    coeffs = spc_ops.coords_to_trilinear_coeffs(coords_1[valid_mask], pts, self.active_lods[lod_idx_1])[..., None]  # 系数
                     fs[valid_mask] = (corner_feats * coeffs).sum(-2)
                 elif self.interpolation_type == 'closest':
                     raise NotImplementedError
