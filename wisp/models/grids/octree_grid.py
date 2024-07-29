@@ -209,6 +209,7 @@ class OctreeGrid(BLASGrid):
                 batch, num_samples = coords_1.shape[:2]
                 if self.interpolation_type == 'linear':
                     fs = torch.zeros(batch, num_samples, self.feature_dim, device=coords_1.device)
+                    fs_1 = torch.zeros(batch, num_samples, 16, device=coords_1.device)
                     valid_mask = pidx_1 > -1
                     valid_pidx = pidx_1[valid_mask]
                     if valid_pidx.shape[0] == 0:
@@ -218,26 +219,27 @@ class OctreeGrid(BLASGrid):
                     idx = self.trinkets.index_select(0, valid_pidx).long()
                     if self.training:
                         logits = feats_1[idx]  # 取idx_feature[n,8,16]
+                        '''
                         y_soft = nn.functional.softmax(logits, dim=-1)
                         index = y_soft.max(-1, keepdim=True)[1]
                         y_hard = torch.zeros_like(logits).scatter_(-1, index, 1.0)
                         keys = y_hard - y_soft.detach() + y_soft
                         corner_feats = (self.dictionary[lod_idx_1][None, None] * keys[..., None]).sum(-2)  # [n,8,5]
+                        '''
                     else:
                         keys = torch.max(feats_1[idx], dim=-1)[1]
                         corner_feats = self.dictionary[lod_idx][keys]
-                    corner_feats = corner_feats[:, None]
+                    # corner_feats = corner_feats[:, None]
                     pts = self.blas.points.index_select(0, valid_pidx)[:, None].repeat(1, coords_1.shape[1], 1)
                     coeffs = spc_ops.coords_to_trilinear_coeffs(coords_1[valid_mask], pts, self.active_lods[lod_idx_1])[..., None]  # 系数
                     logits = logits[:, None, :, :]  # [n, 1, 8, feature_dim]
-                    fs[valid_mask] = (logits * coeffs).sum(-2)  # [n, num_samples, feature_dim]
-
+                    fs_1[valid_mask] = (logits * coeffs).sum(-2)  # [n, num_samples, feature_dim]
                     # fs[valid_mask] = (corner_feats * coeffs).sum(-2)
                 elif self.interpolation_type == 'closest':
                     raise NotImplementedError
                 else:
                     raise Exception(f"Interpolation mode {self.interpolation_type} is not supported.")
-                feat = fs
+                feat = fs_1
 
                 # feat = self._interpolate(coords.reshape(-1, 1, 3), self.features[i], pidx[i].reshape(-1), i)[:, 0]
                 feats.append(feat)
@@ -245,14 +247,18 @@ class OctreeGrid(BLASGrid):
             feats = torch.cat(feats, dim=-1)
 
             if self.multiscale_type == 'sum':
-                feats = feats.reshape(*feats.shape[:-1], num_feats, self.feature_dim)
+                feats = feats.reshape(*feats.shape[:-1], num_feats, 16)
                 if self.training:
                     feats = feats.sum(-2)
                 else:
                     feats = feats.sum(-2)
                 num_feats = 1
-            
-            return feats.reshape(*output_shape, self.feature_dim*num_feats)
+
+            idx_feature = nn.functional.softmax(feats, dim=-1)
+            dic = self.dictionary
+            feats_final = (self.dictionary[None, None] * idx_feature[..., None]).sum(-2)
+
+            return feats_final.reshape(*output_shape, self.feature_dim*num_feats)
 
     def raymarch(self, rays, raymarch_type, num_samples, level=None) -> ASRaymarchResults:
         """Mostly a wrapper over OctreeAS.raymarch. See corresponding function for more details.
