@@ -22,14 +22,14 @@ class OctreeGrid(BLASGrid):
     """
 
     def __init__(
-        self,
-        blas: BaseAS,
-        feature_dim         : int,
-        num_lods            : int          = 1,
-        interpolation_type  : str = 'linear',   # options: 'linear', 'closest'
-        multiscale_type     : str = 'cat',      # options: 'cat', 'sum'
-        feature_std         : float        = 0.0,
-        feature_bias        : float        = 0.0
+            self,
+            blas: BaseAS,
+            feature_dim: int,
+            num_lods: int = 1,
+            interpolation_type: str = 'linear',  # options: 'linear', 'closest'
+            multiscale_type: str = 'cat',  # options: 'cat', 'sum'
+            feature_std: float = 0.0,
+            feature_bias: float = 0.0
     ):
         """Initialize the octree grid class.
 
@@ -70,7 +70,7 @@ class OctreeGrid(BLASGrid):
         # List of octree levels which are optimized.
         self.active_lods = [self.base_lod + x for x in range(self.num_lods)]
 
-        log.info(f"Active LODs: {self.active_lods}")    # TODO(operel): move into trainer
+        log.info(f"Active LODs: {self.active_lods}")  # TODO(operel): move into trainer
 
         if self.num_lods > 0:
             self.init_feature_structure()
@@ -84,14 +84,14 @@ class OctreeGrid(BLASGrid):
             self.points_dual, self.pyramid_dual, self.trinkets, self.parents = \
                 wisp_spc_ops.make_trilinear_spc(self.blas.points, self.blas.pyramid)
             log.info("Built dual octree and trinkets")
-        
+
         # Build the pyramid of features
         fpyramid = []
         for al in self.active_lods:
             if self.interpolation_type == 'linear':
-                fpyramid.append(self.pyramid_dual[0,al]+1)
+                fpyramid.append(self.pyramid_dual[0, al] + 1)
             elif self.interpolation_type == 'closest':
-                fpyramid.append(self.blas.pyramid[0,al]+1)
+                fpyramid.append(self.blas.pyramid[0, al] + 1)
             else:
                 raise Exception(f"Interpolation mode {self.interpolation_type} is not supported.")
         self.num_feat = sum(fpyramid).long()
@@ -102,7 +102,7 @@ class OctreeGrid(BLASGrid):
             fts = torch.zeros(fpyramid[i], self.feature_dim) + self.feature_bias
             fts += torch.randn_like(fts) * self.feature_std
             self.features.append(nn.Parameter(fts))
-        
+
         log.info(f"Pyramid:{self.blas.pyramid[0]}")
         log.info(f"Pyramid Dual: {self.pyramid_dual[0]}")
 
@@ -128,7 +128,7 @@ class OctreeGrid(BLASGrid):
         return feats[idx.long()]
 
     def _interpolate(self, coords, feats, pidx, lod_idx):
-        """Interpolates the given feature using the coordinates x. 
+        """Interpolates the given feature using the coordinates x.
 
         This is a more low level interface for optimization.
 
@@ -148,18 +148,22 @@ class OctreeGrid(BLASGrid):
                 coords, pidx.int(), self.blas.points, self.trinkets.int(),
                 feats.half(), lod).float()
         elif self.interpolation_type == 'closest':
-            fs = self._index_features(feats, pidx.long()-self.blas.pyramid[1, lod])[...,None,:]
+            fs = self._index_features(feats, pidx.long() - self.blas.pyramid[1, lod])[..., None, :]
             fs = fs.expand(batch, num_samples, feats.shape[-1])
-       
+
         # Keep as backup
         elif self.interpolation_type == 'trilinear_old':
             corner_feats = feats[self.trinkets.index_select(0, pidx).long()]
-            coeffs = spc_ops.coords_to_trilinear_coeffs(coords, self.points.index_select(0, pidx)[:,None].repeat(1, coords.shape[1], 1), lod)
+            coeffs = spc_ops.coords_to_trilinear_coeffs(coords, self.points.index_select(0, pidx)[:, None].repeat(1,
+                                                                                                                  coords.shape[
+                                                                                                                      1],
+                                                                                                                  1),
+                                                        lod)
             fs = (corner_feats[:, None] * coeffs[..., None]).sum(-2)
 
         else:
             raise Exception(f"Interpolation mode {self.interpolation_type} is not supported.")
-        
+
         return fs
 
     def interpolate(self, coords, lod_idx):
@@ -177,28 +181,28 @@ class OctreeGrid(BLASGrid):
         # Remember desired output shape, and inflate to (batch, num_samples, 3) format
         output_shape = coords.shape[:-1]
         if coords.ndim < 3:
-            coords = coords[:, None]    # (batch, 3) -> (batch, num_samples, 3)
+            coords = coords[:, None]  # (batch, 3) -> (batch, num_samples, 3)
 
         if lod_idx == 0:
-            query_results = self.blas.query(coords[:,0], self.active_lods[lod_idx], with_parents=False)
+            query_results = self.blas.query(coords[:, 0], self.active_lods[lod_idx], with_parents=False)
             pidx = query_results.pidx
             feat = self._interpolate(coords, self.features[0], pidx, 0)
             return feat.reshape(*output_shape, feat.shape[-1])
         else:
             feats = []
-            
+
             # In the multiscale case, the raytrace _currently_  does not return multiscale indices.
             # As such, no matter what the pidx will be recalculated to get the multiscale indices.
             num_feats = lod_idx + 1
-            
+
             # This might look unoptimal since it assumes that samples are _not_ in the same voxel.
             # This is the correct assumption here, because the point samples are from the base_lod,
             # not the highest LOD.
             query_results = self.blas.query(coords.reshape(-1, 3), self.active_lods[lod_idx], with_parents=True)
-            pidx = query_results.pidx[...,self.base_lod:]
+            pidx = query_results.pidx[..., self.base_lod:]
             pidx = pidx.reshape(-1, coords.shape[1], num_feats)
             pidx = torch.split(pidx, 1, dim=-1)
-            
+
             # list of [batch, num_samples, 1]
 
             for i in range(num_feats):
@@ -229,10 +233,7 @@ class OctreeGrid(BLASGrid):
                     corner_feats = corner_feats[:, None]
                     pts = self.blas.points.index_select(0, valid_pidx)[:, None].repeat(1, coords_1.shape[1], 1)
                     coeffs = spc_ops.coords_to_trilinear_coeffs(coords_1[valid_mask], pts, self.active_lods[lod_idx_1])[..., None]  # 系数
-                    logits = logits[:, None, :, :]  # [n, 1, 8, feature_dim]
-                    fs[valid_mask] = (logits * coeffs).sum(-2)  # [n, num_samples, feature_dim]
-
-                    # fs[valid_mask] = (corner_feats * coeffs).sum(-2)
+                    fs[valid_mask] = (corner_feats * coeffs).sum(-2)
                 elif self.interpolation_type == 'closest':
                     raise NotImplementedError
                 else:
@@ -251,8 +252,8 @@ class OctreeGrid(BLASGrid):
                 else:
                     feats = feats.sum(-2)
                 num_feats = 1
-            
-            return feats.reshape(*output_shape, self.feature_dim*num_feats)
+
+            return feats.reshape(*output_shape, self.feature_dim * num_feats)
 
     def raymarch(self, rays, raymarch_type, num_samples, level=None) -> ASRaymarchResults:
         """Mostly a wrapper over OctreeAS.raymarch. See corresponding function for more details.
