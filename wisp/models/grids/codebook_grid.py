@@ -152,19 +152,20 @@ class CodebookOctreeGrid(OctreeGrid):
         if self.interpolation_type == 'linear':
 
             fs = torch.zeros(batch, num_samples, self.feature_dim, device=coords.device)
-
+            fs_1 = torch.zeros(batch, num_samples, 16, device=coords.device)
             valid_mask = pidx > -1
             valid_pidx = pidx[valid_mask]
             if valid_pidx.shape[0] == 0:
                 return fs
 
-            corner_feats = self._index_features(feats,
-                    self.trinkets.index_select(0, valid_pidx).long(), lod_idx)[:, None]
+            logits = feats[self.trinkets.index_select(0, valid_pidx).long().long()]
 
             pts = self.blas.points.index_select(0, valid_pidx)[:,None].repeat(1, coords.shape[1], 1)
 
             coeffs = spc_ops.coords_to_trilinear_coeffs(coords[valid_mask], pts, self.active_lods[lod_idx])[..., None]
-            fs[valid_mask] = (corner_feats * coeffs).sum(-2)
+            fs_1[valid_mask] = (logits[:, None, :, :] * coeffs).sum(-2)
+            idx_feature = nn.functional.softmax(fs_1, dim=-1)
+            fs = (self.dictionary[lod_idx][None, None] * idx_feature[..., None]).sum(-2)
 
         elif self.interpolation_type == 'closest':
             raise NotImplementedError
