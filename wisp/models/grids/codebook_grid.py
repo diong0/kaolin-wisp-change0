@@ -114,26 +114,22 @@ class CodebookOctreeGrid(OctreeGrid):
         """
         # idx -> [N, 8]
         # [1, 1, 256, 32] * [N, 8, 256, 1] -> [N, 8, 32]
-        
-        if self.training:
-            logits = feats[idx.long()]
-            y_soft = F.softmax(logits, dim=-1)
-            index = y_soft.max(-1, keepdim=True)[1]
-            y_hard = torch.zeros_like(
-                logits, memory_format=torch.legacy_contiguous_format
-            ).scatter_(-1, index, 1.0)
-            keys = y_hard - y_soft.detach() + y_soft
-            result=(self.dictionary[lod_idx][None, None] * keys[..., None]).sum(-2)
-            return result
-            
-            # TODO(ttakikawa): Replace with a cleaner / faster softmax implementation
-            #keys = F.softmax(feats[idx.long()], dim=-1)
-            #return softmax_dictionary(keys, self.dictionary[lod_idx])
-        else:
-            # [N, 8, 256] -> [N, 8]
-            #keys = feats[idx.long()].long()
-            keys = torch.max(feats[idx.long()], dim=-1)[1]
-            return self.dictionary[lod_idx][keys]
+
+        logits = feats[idx.long()]
+        y_soft = F.softmax(logits, dim=-1)
+        index = y_soft.max(-1, keepdim=True)[1]
+        y_hard = torch.zeros_like(
+            logits, memory_format=torch.legacy_contiguous_format
+        ).scatter_(-1, index, 1.0)
+        keys = y_hard - y_soft.detach() + y_soft
+        # result=(self.dictionary[lod_idx][None, None] * keys[..., None]).sum(-2)
+        return keys
+
+        # TODO(ttakikawa): Replace with a cleaner / faster softmax implementation
+        #keys = F.softmax(feats[idx.long()], dim=-1)
+        #return softmax_dictionary(keys, self.dictionary[lod_idx])
+        # [N, 8, 256] -> [N, 8]
+        #keys = feats[idx.long()].long()
     
     def _interpolate(self, coords, feats, pidx, lod_idx):
         """Query multiscale features.
@@ -158,12 +154,11 @@ class CodebookOctreeGrid(OctreeGrid):
             if valid_pidx.shape[0] == 0:
                 return fs
 
-            logits = feats[self.trinkets.index_select(0, valid_pidx).long().long()]
-
+            logits = self._index_features(feats, self.trinkets.index_select(0, valid_pidx).long(), lod_idx)[:, None]
             pts = self.blas.points.index_select(0, valid_pidx)[:,None].repeat(1, coords.shape[1], 1)
 
             coeffs = spc_ops.coords_to_trilinear_coeffs(coords[valid_mask], pts, self.active_lods[lod_idx])[..., None]
-            fs_1[valid_mask] = (logits[:, None, :, :] * coeffs).sum(-2)
+            fs_1[valid_mask] = (logits * coeffs).sum(-2)
             idx_feature = nn.functional.softmax(fs_1, dim=-1)
             fs = (self.dictionary[lod_idx][None, None] * idx_feature[..., None]).sum(-2)
 
