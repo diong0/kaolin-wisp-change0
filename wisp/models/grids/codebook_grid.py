@@ -123,7 +123,7 @@ class CodebookOctreeGrid(OctreeGrid):
                 logits, memory_format=torch.legacy_contiguous_format
             ).scatter_(-1, index, 1.0)
             keys = y_hard - y_soft.detach() + y_soft
-            result=(self.dictionary[lod_idx][None, None] * keys[..., None]).sum(-2)
+            result = (self.dictionary[lod_idx][None, None] * keys[..., None]).sum(-2)
             return result
             
             # TODO(ttakikawa): Replace with a cleaner / faster softmax implementation
