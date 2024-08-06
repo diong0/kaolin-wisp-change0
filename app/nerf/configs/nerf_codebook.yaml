@@ -11,8 +11,8 @@ pretrained: null # If specified, a pretrained model will be loaded from this pat
 log_level: 20    # Log level: logging.INFO
 
 blas: # Occupancy structure (blas: bottom level acceleration structure, for fast ray tracing)
-  constructor: 'OctreeAS.from_pointcloud'
-  level: 8
+  constructor: 'OctreeAS.make_dense'
+  level: 7
 
 grid: # Feature grid, the backbone of the neural field
     constructor: 'CodebookOctreeGrid'
@@ -46,7 +46,7 @@ tracer: # A tracer for intersecting rays with the blas, generating samples along
   step_size: 1.0
 
 dataset:  # Train & validation dataset
-  constructor: 'RTMVDataset'
+  constructor: 'NeRFSyntheticDataset'
   dataset_path: 'data/'
   split: 'train'      # Which subset of the dataset to use for training
   bg_color: [ 1.0, 1.0, 1.0 ]   # The background color to use for when alpha=0.
