@@ -14,6 +14,7 @@ import random
 import torch
 import pandas as pd
 from typing import Optional
+from lpips import LPIPS
 from tqdm import tqdm
 import wisp
 from wisp.config import configure, autoconfig, instantiate

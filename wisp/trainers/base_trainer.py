@@ -83,7 +83,7 @@ class ConfigBaseTrainer:  # 配置类
     scheduler_gamma: float = 0.333
     """ The amount to adjust learning rate at the milestones. """
 
-    valid_metrics: Tuple[str, ...] = ('psnr',)  # lpips, ssim are also supported
+    valid_metrics: Tuple[str, ...] = ('psnr', 'lpips','ssim')  # lpips, ssim are also supported
     """ The validation metrics to use. Will tend to vary based on application. """
 
 

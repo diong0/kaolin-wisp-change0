@@ -236,6 +236,7 @@ class NeRFSyntheticDataset(MultiviewDataset):
             img = load_rgb(fpath)
             if mip is not None and mip > 0:
                 img = resize_mip(img, mip, interpolation=cv2.INTER_AREA)
+            print(img.shape)
             return dict(basename=basename,
                         img=torch.FloatTensor(img), pose=torch.FloatTensor(np.array(frame['transform_matrix'])))
         else:
